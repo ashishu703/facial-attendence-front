@@ -7,14 +7,11 @@ services:
     ports:
       - "4200:443"
     restart: always
-    
-    # --- YAHAN FIX HAI ---
-    # 'extra_hosts' waali line HATA DEIN
-    # Uski jagah yeh add karein:
+    # Yeh zaroori hai
     networks:
       - facial-net
 
-# Yeh poora block file ke end mein add karein
+# Yeh bhi zaroori hai
 networks:
   facial-net:
     external: true
