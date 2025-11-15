@@ -5,7 +5,9 @@ services:
     image: ghcr.io/ashishu703/facial-attendence-front:latest
     container_name: facial-attendence-container
     ports:
-      # Pehle yeh "4200:80" tha
-      # Ab yeh Host ka port 4200 -> Container ka HTTPS port 443 se map hoga
       - "4200:443"
     restart: always
+
+    # Yeh line zaroori hai
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
