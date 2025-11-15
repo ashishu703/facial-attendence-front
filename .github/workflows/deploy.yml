@@ -11,6 +11,13 @@ jobs:
     # Yeh job aapke banaye hue 'self-hosted' runner par chalegi
     runs-on: self-hosted
 
+    # --- YEH FIX HAI ---
+    # Job ko GHCR par push karne ki permission dein
+    permissions:
+      contents: read  # Code ko checkout karne ke liye
+      packages: write # Docker image ko push karne ke liye
+    # --- YAHAN TAK ---
+
     steps:
       - name: 1. Checkout Code
         # Server par code ko lata hai
