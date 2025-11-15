@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  frontend:
+    # Yahan image ka naam wahi hona chahiye jo deploy.yml mein build hoga
+    # Aapka repository name: ashishu703/facial-attendence-front
+    image: ghcr.io/ashishu703/facial-attendence-front:latest
+    container_name: facial-attendence-container
+    ports:
+      # Host ka port 4200 : Container ka port 80 (Nginx)
+      - "4200:80"
+    restart: always
