@@ -34,10 +34,10 @@ RUN echo 'server { \
 }' > /etc/nginx/conf.d/default.conf
 
 # Build stage se banayi gayi static files ko Nginx ke folder mein copy karein
-# --- IMPORTANT ---
-# Agar aapka build output 'dist' folder mein nahi hai (jaise React ke liye 'build'),
-# toh neeche '/app/dist' ko '/app/build' se badal dein.
-COPY --from=build /app/dist /usr/share/nginx/html
+# --- FIX ---
+# Yahan '/app/dist' ko '/app/build' se badal diya hai
+# Kyunki aapka project 'build' folder banata hai, 'dist' nahi.
+COPY --from=blog /app/build /usr/share/nginx/html
 
 # Container port 80 expose karega (jise hum baad mein 4200 se map karenge)
 EXPOSE 80
