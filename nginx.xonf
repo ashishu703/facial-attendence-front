@@ -1,0 +1,34 @@
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    ssl_certificate /etc/nginx/ssl/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx-selfsigned.key;
+
+    # 1. Frontend (React App) ke liye
+    location / {
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 2. Backend 5010 ke liye Proxy
+    location /api-main/ {
+        proxy_pass http://host.docker.internal:5010/;
+    }
+
+    # 3. Backend 5020 ke liye Proxy
+    location /api-mark/ {
+        proxy_pass http://host.docker.internal:5020/;
+    }
+
+    # 4. Backend 5030 ke liye Proxy
+    location /api-verify/ {
+        proxy_pass http://host.docker.internal:5030/;
+    }
+
+    # 5. Backend 5040 ke liye Proxy
+    location /api-register/ {
+        proxy_pass http://host.docker.internal:5040/;
+    }
+}
