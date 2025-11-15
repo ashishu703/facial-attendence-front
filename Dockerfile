@@ -37,7 +37,7 @@ RUN echo 'server { \
 # --- FIX ---
 # Yahan '/app/dist' ko '/app/build' se badal diya hai
 # Kyunki aapka project 'build' folder banata hai, 'dist' nahi.
-COPY --from=blog /app/build /usr/share/nginx/html
+COPY --from=build /app/build /usr/share/nginx/html
 
 # Container port 80 expose karega (jise hum baad mein 4200 se map karenge)
 EXPOSE 80
