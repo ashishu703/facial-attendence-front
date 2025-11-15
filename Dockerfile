@@ -1,31 +1,40 @@
 # Stage 1: Build Stage (Node.js ka istemal karke)
-# Yahan 'node:18-alpine' ek chhota aur fast Node.js image hai
 FROM node:18-alpine AS build
-
-# App ka code copy karne ke liye working directory set karein
 WORKDIR /app
-
-# Pehle package.json copy karein taaki dependencies cache ho sakein
 COPY package*.json ./
-
-# Dependencies install karein
 RUN npm install
-
-# Baaki ka saara source code copy karein
 COPY . .
-
-# App ko production ke liye build karein
-# (Aamtaur par yeh 'dist' ya 'build' folder banata hai)
 RUN npm run build
 
 # Stage 2: Production Stage (Nginx ka istemal karke)
 # Ek halka web server image
 FROM nginx:alpine
 
-# Nginx ko configure karein taaki woh Single Page Applications (SPAs) ko handle kar sake
-# Yeh sabhi requests ko index.html par bhej dega
+# --- YAHAN SE FIX SHURU HAI ---
+
+# 1. SSL certificate banane ke liye openssl install karein
+RUN apk add --no-cache openssl
+
+# 2. SSL certificate store karne ke liye directory banayein
+RUN mkdir -p /etc/nginx/ssl
+
+# 3. 365 dino ke liye ek self-signed certificate aur key banayein
+# Yeh non-interactive mode mein chalega
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/nginx-selfsigned.key \
+    -out /etc/nginx/ssl/nginx-selfsigned.crt \
+    -subj "/C=IN/ST=Delhi/L=Delhi/O=SelfSigned/OU=IT/CN=localhost"
+
+# 4. Nginx ko port 443 (SSL/HTTPS) par sunne ke liye configure karein
+# Yeh pichhli config ko replace kar dega
 RUN echo 'server { \
-    listen 80; \
+    listen 443 ssl; \
+    listen [::]:443 ssl; \
+    \
+    # Certificate aur Key ka path batayein
+    ssl_certificate /etc/nginx/ssl/nginx-selfsigned.crt; \
+    ssl_certificate_key /etc/nginx/ssl/nginx-selfsigned.key; \
+    \
     location / { \
         root /usr/share/nginx/html; \
         index index.html index.htm; \
@@ -33,11 +42,10 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
+# --- YAHAN TAK FIX HAI ---
+
 # Build stage se banayi gayi static files ko Nginx ke folder mein copy karein
-# --- FIX ---
-# Yahan '/app/dist' ko '/app/build' se badal diya hai
-# Kyunki aapka project 'build' folder banata hai, 'dist' nahi.
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Container port 80 expose karega (jise hum baad mein 4200 se map karenge)
-EXPOSE 80
+# Container port 443 expose karega (80 ki jagah)
+EXPOSE 443
