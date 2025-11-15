@@ -1,0 +1,53 @@
+name: CI/CD Pipeline - Frontend
+
+# Yeh workflow 'main' branch par push hone par trigger hoga
+on:
+  push:
+    branches:
+      - main 
+
+jobs:
+  build-and-deploy:
+    # Yeh job aapke banaye hue 'self-hosted' runner par chalegi
+    runs-on: self-hosted
+
+    steps:
+      - name: 1. Checkout Code
+        # Server par code ko lata hai
+        uses: actions/checkout@v4
+
+      - name: 2. Login to GitHub Container Registry (GHCR)
+        # Docker image ko save karne ke liye GitHub registry mein login karein
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }} # Aapka GitHub username
+          password: ${{ secrets.GITHUB_TOKEN }} # Yeh token GitHub automatically deta hai
+
+      - name: 3. Build and Push Docker Image
+        # Dockerfile se image build karein aur GHCR par push karein
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Image ko 'latest' tag ke saath aapki repo mein save karega
+          tags: ghcr.io/${{ github.repository }}:latest
+
+      - name: 4. Deploy on Server (using Docker Compose)
+        # Yeh steps aapke server (srv802965) par chalenge
+        run: |
+          echo "Deployment shuru ho raha hai..."
+          
+          # GitHub se nayi image ko pull karein
+          docker pull ghcr.io/${{ github.repository }}:latest
+          
+          # docker-compose.yml ka istemal karke purane container ko stop aur remove karein
+          docker-compose down
+          
+          # docker-compose.yml se naya container start karein (background mein)
+          docker-compose up -d
+          
+          echo "Deployment poora hua! App port 4200 par live hai."
+          
+          # Purani unused images ko clean karein (optional)
+          docker image prune -f
