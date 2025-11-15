@@ -113,6 +113,22 @@ const MarkAttendance: React.FC = () => {
     
     setCameraError(errorMessage);
     
+    // Check if it's the "getUserMedia is not implemented" error (HTTPS issue)
+    const isHTTPS = window.location.protocol === 'https:';
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isNotImplementedError = errorMessage.includes('not implemented') || 
+                                   errorMessage.includes('getUserMedia is not implemented') ||
+                                   errorMessage.includes('getUserMedia') && errorMessage.includes('not available');
+    
+    if (isNotImplementedError && !isHTTPS && !isLocalhost) {
+      notification.error({
+        message: 'HTTPS Required for Camera Access',
+        description: `Camera access requires HTTPS. Your current URL is HTTP (${window.location.href}). Browser security policy blocks camera access on HTTP for non-localhost domains. Please configure SSL/HTTPS on your VPS server. For VPS: Use Nginx with Let's Encrypt SSL certificate.`,
+        duration: 15,
+      });
+      return;
+    }
+    
     if (errorMessage.includes('NotReadableError') || errorMessage.includes('Could not start video source') || errorName === 'NotReadableError') {
       notification.error({
         message: 'Camera In Use',
