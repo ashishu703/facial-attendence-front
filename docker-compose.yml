@@ -7,7 +7,14 @@ services:
     ports:
       - "4200:443"
     restart: always
+    
+    # --- YAHAN FIX HAI ---
+    # 'extra_hosts' waali line HATA DEIN
+    # Uski jagah yeh add karein:
+    networks:
+      - facial-net
 
-    # Yeh line zaroori hai
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+# Yeh poora block file ke end mein add karein
+networks:
+  facial-net:
+    external: true
