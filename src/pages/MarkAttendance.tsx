@@ -455,7 +455,9 @@ const MarkAttendance: React.FC = () => {
       }
       
       // Basic checks
-      if (loading || !token) {
+      // NOTE: Token is optional for unprotected route (/mark-attendance), so we allow face detection without token
+      // The API call will handle authentication separately
+      if (loading) {
         if (isMounted) {
           checkTimer = setTimeout(detectFaceLocally, 1000);
         }
@@ -463,7 +465,8 @@ const MarkAttendance: React.FC = () => {
       }
       
       const video = webcamRef.current?.video as HTMLVideoElement | undefined;
-      if (!video || video.readyState < 2) {
+      // Check if video exists, is ready, AND has valid dimensions (CRITICAL for tablets!)
+      if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
         if (isMounted) {
           checkTimer = setTimeout(detectFaceLocally, 1000);
         }
@@ -500,6 +503,15 @@ const MarkAttendance: React.FC = () => {
           const { box } = detection;
           const videoWidth = video.videoWidth;
           const videoHeight = video.videoHeight;
+          
+          // CRITICAL FIX: Double-check dimensions are valid before division (prevents NaN/Infinity on tablets)
+          if (videoWidth <= 0 || videoHeight <= 0) {
+            console.warn('[MarkAttendance] Video dimensions invalid:', { videoWidth, videoHeight });
+            if (isMounted) {
+              checkTimer = setTimeout(detectFaceLocally, 1000);
+            }
+            return;
+          }
           
           // Normalized box coordinates for oval
           const normalizedBox = {
@@ -675,14 +687,36 @@ const MarkAttendance: React.FC = () => {
                       .catch(() => {});
                   }
                   
-                  setTimeout(() => {
-                    if (webcamRef.current?.video) {
-                      const video = webcamRef.current.video;
+                  // CRITICAL FIX: Wait for video metadata to load (dimensions available) - especially important for tablets
+                  const video = webcamRef.current?.video;
+                  if (video) {
+                    const checkVideoReady = () => {
+                      if (video.videoWidth > 0 && video.videoHeight > 0) {
+                        console.log('[MarkAttendance] ✅ Video ready with dimensions:', { 
+                          width: video.videoWidth, 
+                          height: video.videoHeight 
+                        });
+                        if (video.paused) {
+                          video.play().catch(() => {});
+                        }
+                      } else {
+                        // Retry after a short delay (tablets need more time)
+                        setTimeout(checkVideoReady, 100);
+                      }
+                    };
+                    
+                    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+                      // Already ready
                       if (video.paused) {
                         video.play().catch(() => {});
                       }
+                    } else {
+                      // Wait for loadedmetadata event (fires when dimensions are available)
+                      video.addEventListener('loadedmetadata', checkVideoReady, { once: true });
+                      // Fallback timeout for tablets that might not fire event properly
+                      setTimeout(checkVideoReady, 500);
                     }
-                  }, 200);
+                  }
                 }}
                 onUserMediaError={(error) => {
                   handleCameraError(error);
