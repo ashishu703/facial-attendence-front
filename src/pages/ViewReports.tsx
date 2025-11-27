@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Card, Table, Select, DatePicker, message, Space, Row, Col, Statistic, Input } from 'antd';
-import { DownloadOutlined, PrinterOutlined, FileExcelOutlined, FilterOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Button, Card, Table, Select, DatePicker, message, Space, Row, Col, Statistic, Input, Modal, Form, TimePicker, DatePicker as AntDatePicker, Popconfirm, InputNumber, Tag, Tooltip } from 'antd';
+import { DownloadOutlined, PrinterOutlined, FileExcelOutlined, FilterOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
@@ -16,6 +16,7 @@ interface Organization {
 }
 
 interface AttendanceRecord {
+  attendance_id?: number;
   employee_code: string;
   employee_name: string;
   employee_type: string;
@@ -31,6 +32,9 @@ interface AttendanceRecord {
   shift_name?: string;
   location_in: string;
   location_out: string | null;
+  is_edited?: boolean;
+  edit_remark?: string | null;
+  edited_at?: string | null;
 }
 
 interface OrgSummary {
@@ -51,6 +55,10 @@ const ViewReports: React.FC = () => {
   const [searchText, setSearchText] = useState<string>('');
   const [filteredData, setFilteredData] = useState<AttendanceRecord[]>([]);
   const { token } = useAuth();
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const editingAttendanceIdRef = useRef<number | null>(null);
+  const [form] = Form.useForm();
 
   const fetchOrganizations = async () => {
     if (!token) return;
@@ -74,7 +82,7 @@ const ViewReports: React.FC = () => {
       });
       setOrgSummary(response.data);
     } catch (error: any) {
-      console.error('Failed to fetch organization summary');
+      // Silently fail - summary will just be empty
     }
   };
 
@@ -121,6 +129,21 @@ const ViewReports: React.FC = () => {
         }
       );
       const data = response.data || [];
+      
+      // Debug: Check if attendance_id is in the response
+      if (data.length > 0) {
+        console.log('First record from API:', data[0]);
+        console.log('attendance_id in first record:', data[0].attendance_id);
+        console.log('Keys in first record:', Object.keys(data[0]));
+        
+        // Count records without attendance_id (they can't be edited but will still be shown)
+        const recordsWithoutId = data.filter((record: any) => !record.attendance_id).length;
+        if (recordsWithoutId > 0) {
+          console.warn(`${recordsWithoutId} record(s) without attendance_id - edit will be disabled for these`);
+        }
+      }
+      
+      // Show all records (even without attendance_id) - edit button will be disabled for those
       setReportData(data);
       setFilteredData(data);
       
@@ -130,7 +153,6 @@ const ViewReports: React.FC = () => {
         message.success(`Found ${data.length} attendance record(s)`);
       }
     } catch (error: any) {
-      console.error('Error fetching report:', error);
       message.error(error.response?.data?.message || 'Failed to fetch report');
       setReportData([]);
       setFilteredData([]);
@@ -212,7 +234,6 @@ const ViewReports: React.FC = () => {
 
       message.success('Excel file downloaded successfully!');
     } catch (error: any) {
-      console.error('Error downloading Excel:', error);
       message.error('Failed to download Excel file');
     }
   };
@@ -249,6 +270,175 @@ const ViewReports: React.FC = () => {
     const hrs = Math.floor(n / 60);
     const mins = Math.round(n % 60);
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  };
+
+  // Handle Edit
+  const handleEdit = (record: AttendanceRecord) => {
+    // Even if attendance_id is missing (older data), allow editing.
+    // For such cases, backend will locate the record using keys (employee_code + date + in_time).
+    setEditingRecord(record);
+    editingAttendanceIdRef.current = record.attendance_id ?? null;
+    
+    // Parse times properly for the form
+    const inTime = record.in_time ? dayjs(record.in_time) : null;
+    const outTime = record.out_time ? dayjs(record.out_time) : null;
+    
+    // Set form values with dayjs objects for time pickers
+    form.setFieldsValue({
+      attendance_date: record.attendance_date ? dayjs(record.attendance_date) : null,
+      in_time: inTime,
+      out_time: outTime,
+      location_in: record.location_in || '',
+      location_out: record.location_out || '',
+      ot_hours_decimal: record.ot_hours_decimal || 0,
+      edit_remark: record.edit_remark || '',
+    });
+    
+    // Open modal
+    setEditModalVisible(true);
+  };
+
+  // Handle Update
+  const handleUpdate = async (values?: any) => {
+    // Get attendance ID from ref first, then fallback to state (may be null for old data)
+    const attendanceId = editingAttendanceIdRef.current ?? editingRecord?.attendance_id ?? null;
+    
+    if (!editingRecord) {
+      message.error('Cannot update: Record data is missing. Please close and reopen the edit modal.');
+      console.error('Update failed - editingRecord is null');
+      return;
+    }
+    
+    try {
+      // Use provided values or validate form
+      const formValues = values || await form.validateFields();
+      
+      // Combine date and time for in_time and out_time
+      const attendanceDate = formValues.attendance_date || dayjs(editingRecord.attendance_date);
+      const dateStr = attendanceDate.format('YYYY-MM-DD');
+      
+      let inTimeISO = editingRecord.in_time;
+      if (formValues.in_time) {
+        // Combine the date from attendance_date with the time from in_time
+        const combinedInTime = attendanceDate
+          .hour(formValues.in_time.hour())
+          .minute(formValues.in_time.minute())
+          .second(formValues.in_time.second());
+        inTimeISO = combinedInTime.toISOString();
+      }
+
+      let outTimeISO: string | null = null;
+      if (formValues.out_time) {
+        // Combine the date from attendance_date with the time from out_time
+        const combinedOutTime = attendanceDate
+          .hour(formValues.out_time.hour())
+          .minute(formValues.out_time.minute())
+          .second(formValues.out_time.second());
+        outTimeISO = combinedOutTime.toISOString();
+      } else if (editingRecord.out_time) {
+        outTimeISO = editingRecord.out_time;
+      }
+
+      const updateData: any = {
+        attendance_date: dateStr,
+        in_time: inTimeISO,
+        location_in: formValues.location_in || editingRecord.location_in || '',
+      };
+
+      // Include out_time if provided or keep existing
+      if (outTimeISO !== null) {
+        updateData.out_time = outTimeISO;
+      }
+      
+      // Include location_out if provided
+      if (formValues.location_out !== undefined) {
+        updateData.location_out = formValues.location_out || null;
+      }
+
+      // Include OT hours if provided
+      if (formValues.ot_hours_decimal !== undefined && formValues.ot_hours_decimal !== null) {
+        updateData.ot_hours_decimal = parseFloat(formValues.ot_hours_decimal);
+      }
+
+      // Include edit remark (required)
+      if (formValues.edit_remark) {
+        updateData.edit_remark = formValues.edit_remark.trim();
+      }
+      
+      if (attendanceId) {
+        // Normal path when attendance_id is available
+        await axios.put(
+          `${API_BASE_URL}/api/attendance/${attendanceId}`,
+          updateData,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      } else {
+        // Fallback path for older records without attendance_id in the report
+        await axios.put(
+          `${API_BASE_URL}/api/attendance/by-keys/update`,
+          {
+            employee_code: editingRecord.employee_code,
+            attendance_date: dateStr,
+            in_time: inTimeISO,
+            ...updateData,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+
+      message.success('Attendance record updated successfully!');
+      setEditModalVisible(false);
+      setEditingRecord(null);
+      editingAttendanceIdRef.current = null;
+      form.resetFields();
+      fetchReport(); // Refresh the report
+    } catch (error: any) {
+      if (error.response) {
+        message.error(error.response?.data?.message || 'Failed to update attendance record');
+      } else if (error.errorFields) {
+        // Form validation errors
+        message.error('Please fill all required fields correctly');
+      } else {
+        message.error(error.message || 'Failed to update attendance record');
+      }
+    }
+  };
+
+  // Handle Delete
+  const handleDelete = async (record: AttendanceRecord) => {
+    try {
+      if (record.attendance_id) {
+        // Normal delete by ID
+        await axios.delete(
+          `${API_BASE_URL}/api/attendance/${record.attendance_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      } else {
+        // Fallback delete by composite keys for older data
+        await axios.delete(
+          `${API_BASE_URL}/api/attendance/by-keys/delete`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            data: {
+              employee_code: record.employee_code,
+              attendance_date: record.attendance_date,
+              in_time: record.in_time,
+            },
+          }
+        );
+      }
+
+      message.success('Attendance record deleted successfully!');
+      fetchReport(); // Refresh the report
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Failed to delete attendance record');
+    }
   };
 
   // Filter data based on search text
@@ -320,6 +510,63 @@ const ViewReports: React.FC = () => {
           <span style={{ fontWeight: 600 }}>{Math.max(0, n).toFixed(2)} hrs</span>
         ) : 'N/A';
       } },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 100,
+      render: (_: any, record: AttendanceRecord) => {
+        if (record.is_edited) {
+          return (
+            <Tooltip title={record.edit_remark ? `Remark: ${record.edit_remark}` : 'This record has been edited'}>
+              <Tag color="orange">Edited</Tag>
+            </Tooltip>
+          );
+        }
+        return null;
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 120,
+      fixed: 'right' as const,
+      render: (_: any, record: AttendanceRecord) => (
+        <Space size="small">
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleEdit(record);
+            }}
+            title="Edit Attendance Record"
+          />
+          <Popconfirm
+            title="Are you sure you want to delete this record?"
+            description="This action cannot be undone."
+            onConfirm={(e) => {
+              e?.stopPropagation();
+              handleDelete(record);
+            }}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              type="link"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title="Delete Attendance Record"
+            />
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   const selectedOrgSummary = orgSummary.find(s => s.organization_id === selectedOrg);
@@ -422,16 +669,145 @@ const ViewReports: React.FC = () => {
 
             {/* Report Table */}
             <Table
-              rowKey={(r) => `${r.employee_code}-${r.attendance_date}-${r.in_time}`}
+              rowKey={(r) => `${r.attendance_id || r.employee_code}-${r.attendance_date}-${r.in_time}`}
               dataSource={filteredData}
               columns={columns}
               loading={loading}
               pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `Total ${total} records` }}
-              scroll={{ x: 1500 }}
+              scroll={{ x: 1600 }}
             />
           </Space>
         </Card>
       </div>
+
+      {/* Edit Modal */}
+      <Modal
+        title={`Edit Attendance - ${editingRecord?.employee_name || ''}`}
+        open={editModalVisible}
+        onOk={() => {
+          form.submit();
+        }}
+        onCancel={() => {
+          setEditModalVisible(false);
+          setEditingRecord(null);
+          editingAttendanceIdRef.current = null;
+          form.resetFields();
+        }}
+        okText="Update"
+        cancelText="Cancel"
+        width={600}
+        centered
+        maskClosable={false}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleUpdate}
+          initialValues={{
+            attendance_date: editingRecord?.attendance_date ? dayjs(editingRecord.attendance_date) : null,
+            in_time: editingRecord?.in_time ? dayjs(editingRecord.in_time) : null,
+            out_time: editingRecord?.out_time ? dayjs(editingRecord.out_time) : null,
+            location_in: editingRecord?.location_in || '',
+            location_out: editingRecord?.location_out || '',
+            ot_hours_decimal: editingRecord?.ot_hours_decimal || 0,
+            edit_remark: editingRecord?.edit_remark || '',
+          }}
+        >
+          <Form.Item
+            label="Attendance Date"
+            name="attendance_date"
+            rules={[{ required: true, message: 'Please select attendance date' }]}
+          >
+            <AntDatePicker
+              style={{ width: '100%' }}
+              format="DD/MM/YYYY"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Check-in Time"
+            name="in_time"
+            rules={[{ required: true, message: 'Please select check-in time' }]}
+          >
+            <TimePicker
+              style={{ width: '100%' }}
+              format="hh:mm A"
+              showNow
+              use12Hours
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Check-out Time"
+            name="out_time"
+            help="Leave empty if not checked out"
+          >
+            <TimePicker
+              style={{ width: '100%' }}
+              format="hh:mm A"
+              showNow
+              allowClear
+              use12Hours
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Location (Check-in)"
+            name="location_in"
+          >
+            <Input placeholder="e.g., (28.6139, 77.2090)" />
+          </Form.Item>
+
+          <Form.Item
+            label="Location (Check-out)"
+            name="location_out"
+          >
+            <Input placeholder="e.g., (28.6139, 77.2090)" allowClear />
+          </Form.Item>
+
+          <Form.Item
+            label="OT Hours (Overtime)"
+            name="ot_hours_decimal"
+            help="Manually set OT hours if different from calculated"
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              min={0}
+              step={0.5}
+              precision={2}
+              placeholder="0.00"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Edit Remark"
+            name="edit_remark"
+            rules={[{ required: true, message: 'Please provide a reason for editing this record' }]}
+            help="Required: Explain why this record is being edited"
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder="e.g., Time correction due to system error, Manual adjustment for late arrival, etc."
+              maxLength={500}
+              showCount
+            />
+          </Form.Item>
+
+          {editingRecord && (
+            <div style={{ marginTop: 12, padding: 10, background: '#f5f5f5', borderRadius: 4, fontSize: '13px' }}>
+              <p style={{ margin: '4px 0' }}><strong>Employee:</strong> {editingRecord.employee_name} ({editingRecord.employee_code})</p>
+              <p style={{ margin: '4px 0' }}><strong>Organization:</strong> {editingRecord.organization_name}</p>
+              <p style={{ margin: '4px 0' }}><strong>Type:</strong> {editingRecord.employee_type}</p>
+              {editingRecord.is_edited && (
+                <p style={{ color: '#ff9800', marginTop: 6, marginBottom: 0, fontSize: '12px' }}>
+                  <strong>⚠️ Previously Edited:</strong> {editingRecord.edit_remark || 'No remark'}
+                </p>
+              )}
+            </div>
+          )}
+        </Form>
+      </Modal>
 
       <style>{`
         @media print {
