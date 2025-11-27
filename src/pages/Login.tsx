@@ -44,7 +44,7 @@ const Login: React.FC = () => {
               { type: 'email', message: 'Please enter a valid email' },
             ]}
           >
-            <Input placeholder="admin@anocab.com" />
+            <Input />
           </Form.Item>
 
           <Form.Item
@@ -52,7 +52,7 @@ const Login: React.FC = () => {
             name="password"
             rules={[{ required: true, message: 'Please enter your password' }]}
           >
-            <Input.Password placeholder="password123" />
+            <Input.Password />
           </Form.Item>
 
           <Form.Item>
@@ -61,11 +61,6 @@ const Login: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-        <div style={{ marginTop: '16px', fontSize: '12px', color: '#999', textAlign: 'center' }}>
-          <p>Demo Credentials:</p>
-          <p>Email: admin@anocab.com</p>
-          <p>Password: password123</p>
-        </div>
       </Card>
     </div>
   );
