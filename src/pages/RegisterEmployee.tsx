@@ -430,6 +430,7 @@ const RegisterEmployee: React.FC = () => {
                 <Select placeholder="Select employee type">
                   <Option value="Office Staff">Office Staff</Option>
                   <Option value="Factory Staff">Factory Staff</Option>
+                  <Option value="Factory Office Staff">Factory Office Staff</Option>
                   <Option value="Intern">Intern</Option>
                 </Select>
               </Form.Item>
