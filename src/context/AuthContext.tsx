@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
+import { message } from 'antd';
 
 interface AuthContextType {
   token: string | null;
@@ -46,7 +47,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(true);
     } catch (error: any) {
       console.error('Login error:', error);
-      throw new Error(error.response?.data?.message || 'Login failed');
+      const msg = error.response?.data?.message || 'Login failed';
+      // Show toast on every login error
+      message.error(msg);
+      throw new Error(msg);
     }
   };
 

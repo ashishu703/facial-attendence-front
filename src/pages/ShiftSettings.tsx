@@ -100,6 +100,7 @@ const ShiftSettings: React.FC = () => {
               <Select placeholder="Select category" style={{ width: 180 }}>
                 <Select.Option value="Office Staff">Office Staff</Select.Option>
                 <Select.Option value="Factory Staff">Factory Staff</Select.Option>
+                <Select.Option value="Factory Office Staff">Factory Office Staff</Select.Option>
                 <Select.Option value="Intern">Intern</Select.Option>
               </Select>
             </Form.Item>
