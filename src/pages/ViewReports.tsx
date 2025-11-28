@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Card, Table, Select, DatePicker, message, Space, Row, Col, Statistic, Input, Modal, Form, TimePicker, DatePicker as AntDatePicker, Popconfirm, InputNumber, Tag, Tooltip } from 'antd';
-import { DownloadOutlined, PrinterOutlined, FileExcelOutlined, FilterOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PrinterOutlined, FileExcelOutlined, FilterOutlined, SearchOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
@@ -60,7 +60,7 @@ const ViewReports: React.FC = () => {
   const editingAttendanceIdRef = useRef<number | null>(null);
   const [form] = Form.useForm();
 
-  const fetchOrganizations = async () => {
+  const fetchOrganizations = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -71,9 +71,9 @@ const ViewReports: React.FC = () => {
     } catch (error: any) {
       message.error('Failed to fetch organizations');
     }
-  };
+  }, [token]);
 
-  const fetchOrgSummary = async () => {
+  const fetchOrgSummary = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -84,22 +84,14 @@ const ViewReports: React.FC = () => {
     } catch (error: any) {
       // Silently fail - summary will just be empty
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchOrganizations();
     fetchOrgSummary();
-  }, [token]);
-
-  // Auto-fetch report on component mount or when filters change
-  useEffect(() => {
-    if (token) {
-      // Auto-load all data on page load (last 30 days)
-      fetchReport();
-    }
-  }, [token]);
-
-  const fetchReport = async () => {
+  }, [fetchOrganizations, fetchOrgSummary]);
+  
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = {};
@@ -159,7 +151,7 @@ const ViewReports: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, selectedOrg, dateRange]);
 
   const handleDownloadExcel = async () => {
     try {

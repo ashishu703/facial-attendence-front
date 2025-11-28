@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Card, Table, Modal, Form, Input, message, Space, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -28,7 +28,7 @@ const OrganizationSettings: React.FC = () => {
   const [form] = Form.useForm();
   const { token } = useAuth();
 
-  const fetchOrganizations = async () => {
+  const fetchOrganizations = useCallback(async () => {
     if (!token) return;
     
     setLoading(true);
@@ -42,11 +42,11 @@ const OrganizationSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchOrganizations();
-  }, [token]);
+  }, [fetchOrganizations]);
 
   const handleAddOrEdit = () => {
     form.validateFields().then(async (values) => {

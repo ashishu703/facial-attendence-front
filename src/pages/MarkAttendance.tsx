@@ -116,9 +116,10 @@ const MarkAttendance: React.FC = () => {
     // Check if it's the "getUserMedia is not implemented" error (HTTPS issue)
     const isHTTPS = window.location.protocol === 'https:';
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isNotImplementedError = errorMessage.includes('not implemented') || 
-                                   errorMessage.includes('getUserMedia is not implemented') ||
-                                   errorMessage.includes('getUserMedia') && errorMessage.includes('not available');
+    const isNotImplementedError =
+      errorMessage.includes('not implemented') ||
+      errorMessage.includes('getUserMedia is not implemented') ||
+      (errorMessage.includes('getUserMedia') && errorMessage.includes('not available'));
     
     if (isNotImplementedError && !isHTTPS && !isLocalhost) {
       notification.error({
