@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Card, Table, Modal, Form, Input, message, Space, Popconfirm, Switch, InputNumber, AutoComplete, Select } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
@@ -65,11 +65,12 @@ const EmailConfiguration: React.FC = () => {
   const [previewData, setPreviewData] = useState<{ subject: string; body: string } | null>(null);
   const [editingConfig, setEditingConfig] = useState<EmailConfig | null>(null);
   const [selectedEventType, setSelectedEventType] = useState<string>('');
-  const [customEventName, setCustomEventName] = useState<string>('');
+  // We only need the setter for this helper state; value itself is never read
+  const [, setCustomEventName] = useState<string>('');
   const [form] = Form.useForm();
   const { token } = useAuth();
 
-  const fetchEmailConfigs = async () => {
+  const fetchEmailConfigs = useCallback(async () => {
     if (!token) return;
     
     setLoading(true);
@@ -82,9 +83,9 @@ const EmailConfiguration: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const fetchTemplateTypes = async () => {
+  const fetchTemplateTypes = useCallback(async () => {
     if (!token) return;
     
     try {
@@ -94,12 +95,12 @@ const EmailConfiguration: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to fetch template types:', error);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchEmailConfigs();
     fetchTemplateTypes();
-  }, [token]);
+  }, [fetchEmailConfigs, fetchTemplateTypes]);
 
   const handleAddOrEdit = () => {
     if (!token) return;
@@ -130,15 +131,15 @@ const EmailConfiguration: React.FC = () => {
     // Check if event_type is a custom event (not in predefined list)
     const isCustomEvent = config.event_type && !EVENT_TYPES.find(e => e.value === config.event_type);
     const eventType = isCustomEvent ? 'custom' : (config.event_type || '');
-    const customEventName = isCustomEvent ? (config.event_type || '') : '';
+    const computedCustomEventName = isCustomEvent ? (config.event_type || '') : '';
     
     form.setFieldsValue({
       ...config,
       event_type: eventType,
-      custom_event_name: customEventName
+      custom_event_name: computedCustomEventName
     });
     setSelectedEventType(eventType);
-    setCustomEventName(customEventName || '');
+    setCustomEventName(computedCustomEventName || '');
     setModalVisible(true);
   };
 

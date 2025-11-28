@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Form, Input, Select, Button, Card, Row, Col, Spin, Tooltip, Modal, App as AntApp } from 'antd';
+import { Form, Input, Select, Button, Card, Row, Col, Tooltip, Modal, App as AntApp } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import Webcam from 'react-webcam';
 import axios from 'axios';
@@ -20,7 +20,7 @@ interface Organization {
 const RegisterEmployee: React.FC = () => {
   const webcamRef = useRef<Webcam>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
+  // Simple face verification flag was unused – keep logic straightforward
   const [faceVerified, setFaceVerified] = useState<boolean | null>(null);
   const [form] = Form.useForm();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -57,7 +57,6 @@ const RegisterEmployee: React.FC = () => {
   const { message, notification } = AntApp.useApp();
 
   const verifyFace = async (imageSrc: string) => {
-    setIsVerifying(true);
     try {
       const response = await fetch(imageSrc);
       const blob = await response.blob();
@@ -95,7 +94,7 @@ const RegisterEmployee: React.FC = () => {
       });
       setFaceVerified(false);
     } finally {
-      setIsVerifying(false);
+      // no-op: we don't track a separate verifying spinner
     }
   };
 
@@ -128,9 +127,10 @@ const RegisterEmployee: React.FC = () => {
     // Check if it's the "getUserMedia is not implemented" error (HTTPS issue)
     const isHTTPS = window.location.protocol === 'https:';
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isNotImplementedError = errorMessage.includes('not implemented') || 
-                                   errorMessage.includes('getUserMedia is not implemented') ||
-                                   errorMessage.includes('getUserMedia') && errorMessage.includes('not available');
+    const isNotImplementedError =
+      errorMessage.includes('not implemented') ||
+      errorMessage.includes('getUserMedia is not implemented') ||
+      (errorMessage.includes('getUserMedia') && errorMessage.includes('not available'));
     
     if (isNotImplementedError && !isHTTPS && !isLocalhost) {
       notification.error({
@@ -218,9 +218,10 @@ const RegisterEmployee: React.FC = () => {
 
   // Cleanup: stop any active streams when component unmounts
   React.useEffect(() => {
+    const currentWebcam = webcamRef.current;
     return () => {
-      if (webcamRef.current?.video?.srcObject) {
-        const stream = webcamRef.current.video.srcObject as MediaStream;
+      if (currentWebcam?.video?.srcObject) {
+        const stream = currentWebcam.video.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
     };

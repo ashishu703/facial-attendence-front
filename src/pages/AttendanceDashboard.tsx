@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Row, Col, Statistic, Table, Spin, Select, message } from 'antd';
 import { UserOutlined, TeamOutlined, ClockCircleOutlined, RiseOutlined } from '@ant-design/icons';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -59,7 +59,7 @@ const AttendanceDashboard: React.FC = () => {
     }
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!token) return;
     
     setLoading(true);
@@ -103,11 +103,11 @@ const AttendanceDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [token]);
+  }, [fetchDashboardData]);
 
   useEffect(() => {
     if (selectedOrg) {
