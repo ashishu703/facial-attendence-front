@@ -3,7 +3,9 @@ import { Button, Card, Form, Input, Modal, Popconfirm, Table, Select, Tooltip, n
 import axios from 'axios';
 import Navigation from '../components/Navigation';
 import { useAuth } from '../context/AuthContext';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+
+const { Search } = Input;
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4500';
 
@@ -25,6 +27,7 @@ const Employees: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState('');
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const load = useCallback(async () => {
@@ -90,15 +93,48 @@ const Employees: React.FC = () => {
     }
   };
 
+  // Filter employees based on search text
+  const filteredData = useMemo(() => {
+    if (!searchText.trim()) {
+      return data;
+    }
+    const searchLower = searchText.toLowerCase().trim();
+    return data.filter((emp) => {
+      return (
+        emp.employee_name?.toLowerCase().includes(searchLower) ||
+        emp.employee_code?.toLowerCase().includes(searchLower) ||
+        emp.email?.toLowerCase().includes(searchLower) ||
+        emp.department?.toLowerCase().includes(searchLower) ||
+        emp.position?.toLowerCase().includes(searchLower) ||
+        emp.phone_number?.includes(searchText) ||
+        emp.employee_type?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [data, searchText]);
+
   return (
     <div>
       <Navigation />
       <div style={{ padding: 24 }}>
-        <Card title="All Employees">
+        <Card 
+          title="All Employees"
+          extra={
+            <Search
+              placeholder="Search by name, code, email, department, position, phone..."
+              allowClear
+              enterButton={<SearchOutlined />}
+              size="large"
+              style={{ width: 400 }}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onSearch={(value) => setSearchText(value)}
+            />
+          }
+        >
           <Table
             rowKey="employee_id"
             loading={loading}
-            dataSource={data}
+            dataSource={filteredData}
             pagination={{ pageSize: 20, showSizeChanger: true }}
             columns={[
               { title: 'Code', dataIndex: 'employee_code', width: 180 },
