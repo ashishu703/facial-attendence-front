@@ -260,6 +260,12 @@ const MarkAttendance: React.FC = () => {
       const imageSrc = webcamRef.current?.getScreenshot();
       if (!imageSrc) {
         setLoading(false);
+        autoTriggeredRef.current = false;
+        presenceStartRef.current = null;
+        lastFaceSigRef.current = null;
+        setFaceDetected(false);
+        setFaceBox(null);
+        cooldownUntilRef.current = Date.now() + 2000;
         notification.error({
           message: 'Capture Failed',
           description: 'Failed to capture image. Please try again.',
@@ -300,6 +306,12 @@ const MarkAttendance: React.FC = () => {
       
       if (!status || !employee_name) {
         setLoading(false);
+        autoTriggeredRef.current = false;
+        presenceStartRef.current = null;
+        lastFaceSigRef.current = null;
+        setFaceDetected(false);
+        setFaceBox(null);
+        cooldownUntilRef.current = Date.now() + 2000;
         notification.error({
           message: '❌ Invalid Response',
           description: 'Server returned invalid data. Please try again.',
@@ -365,7 +377,15 @@ const MarkAttendance: React.FC = () => {
         autoTriggeredRef.current = false;
       }, 500);
     } catch (error: any) {
+      // Reset all states on any error to allow retry
       setLoading(false);
+      autoTriggeredRef.current = false;
+      presenceStartRef.current = null;
+      lastFaceSigRef.current = null;
+      
+      // Reset face detection state
+      setFaceDetected(false);
+      setFaceBox(null);
       
       if (error.response) {
         const status = error.response.status;
@@ -373,8 +393,6 @@ const MarkAttendance: React.FC = () => {
         
         // Handle unregistered face (401) - face not registered
         if (status === 401) {
-          setLoading(false);
-          
           // Show toast notification
           notification.error({
             message: 'Face Not Registered',
@@ -383,24 +401,8 @@ const MarkAttendance: React.FC = () => {
             placement: 'topRight',
           });
           
-          // Reset detection state
-          const centerBox = {
-            x: 0.25,
-            y: 0.15,
-            width: 0.5,
-            height: 0.7
-          };
-          setFaceBox(centerBox);
-          setFaceDetected(false);
-          presenceStartRef.current = null;
-          autoTriggeredRef.current = false;
-          lastFaceSigRef.current = null;
-          
           // Small cooldown before trying again
           cooldownUntilRef.current = Date.now() + 2000;
-          setTimeout(() => {
-            autoTriggeredRef.current = false;
-          }, 2000);
           
           return;
         }
@@ -421,6 +423,9 @@ const MarkAttendance: React.FC = () => {
           duration: 6,
           placement: 'topRight',
         });
+        
+        // Reset cooldown after error (allow immediate retry after short delay)
+        cooldownUntilRef.current = Date.now() + 2000;
       } else {
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
         notification.error({
@@ -431,6 +436,9 @@ const MarkAttendance: React.FC = () => {
           duration: 6,
           placement: 'topRight',
         });
+        
+        // Reset cooldown after error (allow immediate retry after short delay)
+        cooldownUntilRef.current = Date.now() + 2000;
       }
     }
   }, [token, loading, notification]);
@@ -540,17 +548,29 @@ const MarkAttendance: React.FC = () => {
             console.log('[MarkAttendance] 🎯 3 seconds continuous face detected, calling mark API...');
             
             // Call mark API (it will match face with DB and mark attendance)
-            handleMarkAttendance().then(() => {
-              presenceStartRef.current = null;
-              cooldownUntilRef.current = Date.now() + COOLDOWN_MS;
-              
-              setTimeout(() => { 
-                if (isMounted) {
-                  autoTriggeredRef.current = false;
-                  console.log('[MarkAttendance] Ready for next attempt');
-                }
-              }, COOLDOWN_MS);
-            });
+            handleMarkAttendance()
+              .then(() => {
+                presenceStartRef.current = null;
+                cooldownUntilRef.current = Date.now() + COOLDOWN_MS;
+                
+                setTimeout(() => { 
+                  if (isMounted) {
+                    autoTriggeredRef.current = false;
+                    console.log('[MarkAttendance] Ready for next attempt');
+                  }
+                }, COOLDOWN_MS);
+              })
+              .catch((error) => {
+                // Reset state on error to allow retry
+                console.error('[MarkAttendance] Mark attendance error:', error);
+                autoTriggeredRef.current = false;
+                presenceStartRef.current = null;
+                lastFaceSigRef.current = null;
+                setFaceDetected(false);
+                setFaceBox(null);
+                // Short cooldown before allowing retry
+                cooldownUntilRef.current = Date.now() + 2000;
+              });
           }
         } else {
           // ❌ NO FACE DETECTED - Show RED oval
