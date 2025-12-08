@@ -7,6 +7,22 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AuthProvider } from './context/AuthContext';
 
+// Fix for webdriver property redefinition error (caused by browser extensions/automation tools)
+if (typeof navigator !== 'undefined' && navigator.webdriver !== undefined) {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'webdriver');
+    if (descriptor && descriptor.configurable) {
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => descriptor.value,
+        configurable: true
+      });
+    }
+  } catch (e) {
+    // Silently ignore if we can't fix it
+    console.warn('Could not fix webdriver property:', e);
+  }
+}
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
