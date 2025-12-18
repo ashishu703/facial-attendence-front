@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Popconfirm, Table, Select, Tooltip, notification } from 'antd';
+import { Button, Card, Form, Input, Modal, Popconfirm, Table, Select, Tooltip, notification, Switch } from 'antd';
 import axios from 'axios';
 import Navigation from '../components/Navigation';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ interface Employee {
   employee_type: string;
   aadhar_last4: string | null;
   employee_code: string | null;
+  is_active?: boolean;
 }
 
 const Employees: React.FC = () => {
@@ -93,6 +94,27 @@ const Employees: React.FC = () => {
     }
   };
 
+  const toggleActive = async (emp: Employee) => {
+    try {
+      const res = await axios.patch(
+        `${API_BASE_URL}/api/employees/${emp.employee_id}/toggle-active`,
+        {},
+        { headers }
+      );
+      notification.success({
+        message: res.data.message || `Employee ${res.data.is_active ? 'activated' : 'deactivated'}`,
+        placement: 'topRight',
+      });
+      load();
+    } catch (e: any) {
+      notification.error({
+        message: 'Failed to Toggle Status',
+        description: e.response?.data?.message || 'An error occurred',
+        placement: 'topRight',
+      });
+    }
+  };
+
   // Filter employees based on search text
   const filteredData = useMemo(() => {
     if (!searchText.trim()) {
@@ -135,7 +157,12 @@ const Employees: React.FC = () => {
             rowKey="employee_id"
             loading={loading}
             dataSource={filteredData}
-            pagination={{ pageSize: 20, showSizeChanger: true }}
+            pagination={{ 
+              pageSize: 20, 
+              showSizeChanger: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} employees`
+            }}
             columns={[
               { title: 'Code', dataIndex: 'employee_code', width: 180 },
               { title: 'Name', dataIndex: 'employee_name' },
@@ -144,6 +171,21 @@ const Employees: React.FC = () => {
               { title: 'Position', dataIndex: 'position' },
               { title: 'Email', dataIndex: 'email' },
               { title: 'Phone', dataIndex: 'phone_number' },
+              {
+                title: 'Status',
+                key: 'status',
+                width: 100,
+                render: (_: any, r: Employee) => (
+                  <Tooltip title={r.is_active !== false ? 'Active' : 'Inactive'}>
+                    <Switch
+                      checked={r.is_active !== false}
+                      onChange={() => toggleActive(r)}
+                      checkedChildren="Active"
+                      unCheckedChildren="Inactive"
+                    />
+                  </Tooltip>
+                )
+              },
               {
                 title: 'Actions',
                 key: 'actions',
