@@ -487,7 +487,12 @@ const AttendanceDashboard: React.FC = () => {
                 dataSource={filteredEmployees}
                 columns={employeeColumns}
                 rowKey="employee_id"
-                pagination={{ pageSize: 20, showSizeChanger: true }}
+                pagination={{ 
+                  pageSize: 20, 
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} employees`
+                }}
                 scroll={{ x: 1200 }}
                 size="middle"
               />
