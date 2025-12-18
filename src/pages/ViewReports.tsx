@@ -240,7 +240,7 @@ const ViewReports: React.FC = () => {
   };
 
   const formatTime = (dateString: string | null): string => {
-    if (!dateString) return 'Not checked out';
+    if (!dateString) return 'N/A';
     return dayjs(dateString).format('hh:mm:ss A');
   };
 
